@@ -23,6 +23,7 @@ ANGLE_CORRECTION_DEGREES = 0
 FAST_REFRESH = 0.005
 POST_CAST_DELAY = 3
 SHOW_VISUAL_DEBUG = False
+
 DEBUG_SCALE = 0.4 
 NUM_WORKERS = 8 # Number of cores working on process
 # ------------------
