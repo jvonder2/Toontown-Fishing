@@ -5,6 +5,9 @@ import time
 import math
 import mss
 from concurrent.futures import ThreadPoolExecutor
+import threading
+import tkinter as tk
+import keyboard 
 
 # Load templates
 fish_template = cv.imread('fish_shadow_fixed.jpg', cv.IMREAD_COLOR)
@@ -23,20 +26,17 @@ ANGLE_CORRECTION_DEGREES = 0
 FAST_REFRESH = 0.005
 POST_CAST_DELAY = 3
 SHOW_VISUAL_DEBUG = False
-
+running = False
 DEBUG_SCALE = 0.4 
 NUM_WORKERS = 8 # Number of cores working on process
 # ------------------
 
-# Setup screen capture with mss
-sct = mss.mss()
-monitor = sct.monitors[1]
-
 def get_screen():
-    sct_img = sct.grab(monitor)
+    with mss.mss() as sct:
+        mon   = sct.monitors[1]
+        sct_img = sct.grab(mon)
     img = np.array(sct_img)
-    img_bgr = cv.cvtColor(img, cv.COLOR_BGRA2BGR)
-    return img_bgr
+    return cv.cvtColor(img, cv.COLOR_BGRA2BGR)
 
 def locate_on_screen(template, screenshot_bgr):
     result = cv.matchTemplate(screenshot_bgr, template, cv.TM_CCOEFF_NORMED)
@@ -81,9 +81,12 @@ def process_frame():
     
     return fish_pos, fish_conf, dot_pos, dot_conf, img_bgr
 
-def main():
+def run_bot():
+    sct = mss.mss()
+    monitor = sct.monitors[1]
     try:
-        while True:
+        while running:
+            print("testing")
             fish_pos, fish_conf, dot_pos, dot_conf, img_bgr = process_frame()
             # Skip if red X was clicked
             if fish_pos is None:
@@ -108,8 +111,47 @@ def main():
                 time.sleep(POST_CAST_DELAY)
             
     except KeyboardInterrupt:
-        print("\nBot stopped.")
+        pass
+    finally:
         cv.destroyAllWindows()
+
+def toggle():
+    global running
+    running = not running
+
+    if running:
+        # starting the bot
+        threading.Thread(target=run_bot, daemon=True).start()
+
+    # update button/label
+    status_label.config(
+      text=f"Status: {'ON' if running else 'OFF'}",
+      fg="green" if running else "red"
+    )
+    toggle_button.config(text="Stop" if running else "Start")
+
+def main():
+    threading.Thread(target=run_bot, daemon=True).start()
+    root = tk.Tk()         
+    root.title("Spacebar Presser")    
+    root.geometry("600x300")   
+    root.attributes('-topmost', True)
+
+    global status_label
+    status_label = tk.Label(root, text="Status: OFF", font=("Arial", 16), fg="red")
+    status_label.pack(pady=10)
+
+    global toggle_button
+    toggle_button = tk.Button(root, text="Start", command=toggle, font=("Arial", 14), width=10)
+    toggle_button.pack(pady=10)
+
+    quit_button = tk.Button(root, text="Quit", 
+                            command=lambda: (keyboard.unhook_all_hotkeys(), root.destroy()), 
+                            font=("Arial", 12))
+    quit_button.pack(pady=5)
+
+    keyboard.add_hotkey('0', toggle)
+    root.mainloop()
 
 if __name__ == "__main__":
     main()
